@@ -1,0 +1,128 @@
+---
+title: "gh2 STSRS 1"
+author: "Min Kim"
+date: "2025-02-21"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library(MASS)
+library(here)
+library(dplyr)
+library(tidyr)
+```
+
+
+## STSRS 1
+```{r, import dataset and function files}
+SAfrica <- read.csv(here("Datasets", "SouthAfrica2014fv.csv"))
+source(here("Examples", "stmean.R"))
+source(here("Examples", "stallocm.R"))
+```
+
+### a. & b. estiamte total #, total mean of eforensics-fraudulent votes, n = 1500
+```{r}
+# define parameters
+set.seed(776)
+n <- 1500
+
+# calculate population size of each stratum
+Ns <- xtabs(~N.PROVINCE, SAfrica)
+strata <- names(Ns)
+
+# create a proportionally stratified sample
+ns <- round((n / sum(Ns)) * Ns)
+
+# perform STSRS
+sstrata <- vector(mode = "character")
+ef <- vector(mode = "numeric")
+for(j in strata) {
+  sstrata <- c(sstrata, rep(j, ns[j]))
+  ef <- c(ef, SAfrica$Nfraudmean[SAfrica$N.PROVINCE == j][sample(Ns[j], ns[j])])
+}
+
+# combined sample data into data frame
+sdat <- data.frame(sstrata, ef)
+
+# use stmean() function to calculate stratified total, mean, and bounds of e-fraud votes
+STM <- stmean(sdat, "ef", "sstrata", Ns)
+cat("STSRS Total", STM$mean * sum(Ns), "\n")
+cat("STSRS Mean", STM$mean, "\n")
+cat("STSRS Bound on Mean:", STM$bound, "\n")
+```
+### c. comparisons to SRS
+```{r}
+# define parameters
+set.seed(943)
+SRS_sample <- sample(nrow(SAfrica), n)
+SRS_y <- SAfrica$Nfraudmean[SRS_sample]
+SRS_mean <- mean(SRS_y)
+SRS_var_mean <- var(SRS_y) / n * ((nrow(SAfrica) - n) / nrow(SAfrica))
+SRS_bound <- 2 * sqrt(SRS_var_mean)
+
+cat("SRS Total", sum(ns), "\n")
+cat("SRS Mean", SRS_mean, "\n")
+cat("SRS Bound on Mean", SRS_bound, "\n")
+
+```
+
+### d. & e. design and compute STSRS estimates; evaluate estimation for B = 5
+```{r}
+# Define parameters
+set.seed(472)
+B <- 5
+
+# estimate in-strata stdev 
+stdevs <- sapply(strata, function(z) {
+  sqrt(var(0.25 * SAfrica$Votes[SAfrica$N.PROVINCE == z]))
+})
+stdevs <- na.omit(stdevs)
+
+# allocate sample sizes to achieve B = 5
+# use stallocm() function
+allocation <- stallocm(Ns, stdevs, B, rep(1, length(strata)))
+nsB5 <- round(allocation$ni)
+
+# perform STSRS for B = 5 (design)
+sstrataB5 <- vector(mode = "character")
+efB5 <- vector(mode = "numeric")
+for (j in strata) {
+  sstrataB5 <- c(sstrataB5, rep(j, nsB5[j]))
+  efB5 <- c(efB5, SAfrica$Nfraudmean[SAfrica$N.PROVINCE == j][sample(Ns[j], nsB5[j])])
+}
+
+# combine stratified sample into data frame
+sdatB5 <- data.frame(sstrataB5, efB5)
+
+# compute STSRS estimates for B = 5
+STMB5 <- stmean(sdatB5, "efB5", "sstrataB5", Ns)
+STMB5$mean <- STMB5$mean
+STMB5$bound <- STMB5$bound
+cat("STSRS designed for B = 5 Mean:", STMB5$mean, "\n")
+cat("STSRS designed for B = 5 Bound:", STMB5$bound, "\n")
+cat("Sample size for STSRS B = 5:", sum(nsB5), "\n")
+```
+
+### f. comparisons to SRS for B = 5
+```{r}
+# define parameters
+set.seed(87)
+
+# estimate variance of Nfraudmean
+sigma2 <- var(.25 * SAfrica$Votes)
+
+# SRS sample size for mean B = 5
+n_SRS_B5 <- ceiling(nrow(SAfrica) * sigma2 / ((nrow(SAfrica) - 1)*(B^2 / 4) + sigma2))
+
+# perform SRS for B = 5 (design)
+SRS_sample_B5 <- sample(1:nrow(SAfrica), n_SRS_B5)
+SRS_y_B5 <- SAfrica$Nfraudmean[SRS_sample_B5]
+SRS_mean_B5 <- mean(SRS_y_B5)
+S2_SRS_B5 <- var(SRS_y_B5)
+SRS_bound_B5 <- 2 * sqrt(S2_SRS_B5 * ((nrow(SAfrica) - n_SRS_B5) / nrow(SAfrica)))
+cat("SRS for B=5 sample size:", n_SRS_B5, "\n")
+cat("SRS for B=5 Mean:", SRS_mean_B5, "\n")
+cat("SRS for B=5 Bound:", SRS_bound_B5, "\n")
+
+```
+
