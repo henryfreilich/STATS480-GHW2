@@ -1,0 +1,23 @@
+---
+title: "Stats480_GH2"
+author: "Nicholas Chang"
+date: "2025-02-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+collegedata <- read.table("wiki_colleges.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+set.seed(12345)
+
+sample_colleges <- data.frame(collegedata[sample(nrow(collegedata), size = 100), ])
+
+subsample_colleges <- data.frame(sample_colleges[sample(nrow(sample_colleges), size = 30), ])
+
+sample_colleges
+subsample_colleges
+```
